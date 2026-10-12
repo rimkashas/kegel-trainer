@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kegel Trainer</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0}
+main{max-width:520px;margin:auto;padding:16px}h1{font-size:1.5rem;margin:.2em 0}
+.card{background:#1e293b;border-radius:14px;padding:14px;margin:12px 0}
+button{font-size:1rem;padding:12px 18px;border:0;border-radius:10px;background:#6366f1;color:#fff;margin:4px}
+button.sec{background:#334155}
+#cue{height:220px;border-radius:50%;width:220px;margin:10px auto;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;background:#334155;transition:transform .4s,background .4s}
+#cue.sq{background:#e11d48;transform:scale(.8)}#cue.rl{background:#10b981;transform:scale(1.05)}
+.c{text-align:center}.big{font-size:2.5rem;font-weight:700}table{width:100%;border-collapse:collapse}td{padding:4px;border-bottom:1px solid #334155}
+.cur{color:#a5b4fc;font-weight:700}label{display:inline-block;margin:4px 8px}li{margin:4px 0}
+</style></head><body><main>
+<h1>Kegel Trainer</h1>
+<div id="warn" class="card" style="display:none;background:#7c2d12">⚠️ Browser storage is unavailable here (private mode or a sandboxed/attachment viewer). Progress is kept only until you close this page. Open the file directly in Chrome/Safari/Firefox to save progress.</div>
+<div id="saved" class="card c" style="display:none;background:#065f46;font-weight:700"></div>
+<div class="card"><div>Week <b id="wk"></b> · Today: <b id="today"></b>/3 sessions · Streak: <b id="streak"></b> days · Total: <b id="total"></b></div>
+<div id="plandesc" style="margin-top:6px;color:#94a3b8"></div></div>
+<div class="card c"><div id="cue">Ready</div><div class="big" id="timer">–</div>
+<div id="rep">Rep 0/0</div><div id="phase" style="color:#94a3b8"></div>
+<button id="start">Start session</button><button class="sec" id="stop">Stop</button><br>
+<label><input type="checkbox" id="beep" checked> Beep</label><label><input type="checkbox" id="vib" checked> Vibrate</label></div>
+<div class="card"><b>4-week beginner plan</b><table id="plan"></table>
+<button class="sec" id="prev">◀ Week</button><button class="sec" id="next">Week ▶</button><button class="sec" id="reset">Reset progress</button></div>
+<div class="card"><b>Last 7 days</b><div id="hist"></div></div>
+<div class="card"><b>Tips</b><ul>
+<li><b>Find the right muscles:</b> they're the ones you'd use to stop gas or hold urine. Tighten, lift up and in.</li>
+<li><b>Breathe normally</b> — don't hold your breath.</li>
+<li><b>Don't squeeze glutes, abs or thighs</b>; keep them relaxed.</li>
+<li><b>Don't do Kegels while urinating</b> (can cause incomplete emptying / infections).</li>
+<li><b>Stop if you feel pain</b> and consult a doctor or pelvic floor physiotherapist.</li>
+<li>Fully relax between squeezes — relaxing matters as much as squeezing.</li></ul></div>
+</main><script>
+const PLAN=[{h:3,r:3,n:10,f:0},{h:5,r:5,n:10,f:0},{h:5,r:5,n:10,f:10},{h:8,r:8,n:10,f:10}],PER_DAY=3,DAYS_PER_WEEK=7;
+const $=id=>document.getElementById(id),K='kegel_v1';
+const MEM={};let STORE_OK=true;
+function sGet(){try{return window.localStorage.getItem(K)}catch(e){STORE_OK=false;return MEM[K]||null}}
+function sSet(v){MEM[K]=v;try{window.localStorage.setItem(K,v);if(window.localStorage.getItem(K)!==v)throw 0}catch(e){STORE_OK=false}}
+let S=null;try{S=JSON.parse(sGet()||'null')}catch(e){}
+if(!S||typeof S!=='object'||!S.days)S={start:null,days:{},weekOverride:null};
+const save=()=>{sSet(JSON.stringify(S));const w=document.getElementById('warn');if(w)w.style.display=STORE_OK?'none':'block'};
+const dkey=d=>{d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+function week(){if(S.weekOverride!=null)return S.weekOverride;if(!S.start)return 0;
+ // auto-advance: one week per 7 days since first session, but only if ≥10 sessions done in current week
+ const days=Math.floor((new Date(dkey())-new Date(S.start))/864e5);let w=0;
+ for(let i=1;i<4;i++){if(days>=i*7&&sessIn(S.start,(i-1)*7,i*7)>=10)w=i;else break}return w}
+function sessIn(st,a,b){let c=0;for(let i=a;i<b;i++){const d=new Date(st);d.setDate(d.getDate()+i);c+=S.days[dkey(d)]||0}return c}
+function streak(){let s=0,d=new Date();if(!S.days[dkey(d)])d.setDate(d.getDate()-1);while(S.days[dkey(d)]){s++;d.setDate(d.getDate()-1)}return s}
+const desc=p=>`${p.n}× squeeze ${p.h}s / relax ${p.r}s`+(p.f?` + ${p.f} quick 1s flicks`:'')+`, ${PER_DAY} sessions/day`;
+function render(){const w=week(),p=PLAN[w];$('wk').textContent=w+1;$('today').textContent=S.days[dkey()]||0;$('streak').textContent=streak();
+ $('total').textContent=Object.values(S.days).reduce((a,b)=>a+b,0);$('plandesc').textContent=desc(p);
+ $('plan').innerHTML=PLAN.map((q,i)=>`<tr class="${i==w?'cur':''}"><td>Week ${i+1}</td><td>${desc(q)}</td></tr>`).join('');
+ let h='';for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const n=S.days[dkey(d)]||0;h+=`<div>${dkey(d)}: ${'●'.repeat(Math.min(n,PER_DAY))}${'○'.repeat(Math.max(0,PER_DAY-n))} ${n}</div>`}$('hist').innerHTML=h}
+let ac,tm=null,steps=[],si=0,left=0;
+function beep(f){try{if(!$('beep').checked)return;ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;g.gain.value=.15;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.15)}catch(e){}}
+function vib(ms){try{if($('vib').checked&&navigator.vibrate)navigator.vibrate(ms)}catch(e){}}
+function build(p){const s=[{t:'Get ready',d:3,c:'',l:'Prepare'}];for(let i=1;i<=p.n;i++){s.push({t:'Squeeze',d:p.h,c:'sq',l:'Hold',rep:i,of:p.n});s.push({t:'Relax',d:p.r,c:'rl',l:'Relax',rep:i,of:p.n})}
+ if(p.f){s.push({t:'Rest',d:5,c:'',l:'Quick flicks next'});for(let i=1;i<=p.f;i++){s.push({t:'Flick!',d:1,c:'sq',l:'Quick flicks',rep:i,of:p.f});s.push({t:'Relax',d:1,c:'rl',l:'Quick flicks',rep:i,of:p.f})}}return s}
+function show(){const s=steps[si];$('cue').textContent=s.t;$('cue').className=s.c;$('timer').textContent=left;$('phase').textContent=s.l;$('rep').textContent=s.rep?`Rep ${s.rep}/${s.of}`:'Rep –'}
+function enter(){const s=steps[si];left=s.d;if(s.c=='sq'){beep(880);vib(200)}else if(s.c=='rl'){beep(440);vib([60,60,60])}show()}
+function tick(){left--;if(left<=0){si++;if(si>=steps.length)return done();enter()}else show()}
+function startS(){if(tm)return;steps=build(PLAN[week()]);si=0;enter();tm=setInterval(tick,1000)}
+function stopS(){clearInterval(tm);tm=null;$('cue').textContent='Ready';$('cue').className='';$('timer').textContent='–';$('phase').textContent='Stopped';}
+function done(){clearInterval(tm);tm=null;const k=dkey();if(!S.start)S.start=k;S.days[k]=(S.days[k]||0)+1;
+ try{save()}catch(e){STORE_OK=false}
+ render();$('cue').textContent='Done! 🎉';$('cue').className='rl';$('timer').textContent='✓';
+ $('phase').textContent=STORE_OK?'Session saved ✓':'Session counted ✓ (not saved permanently – storage blocked)';
+ const m=$('saved');m.textContent=STORE_OK?'Session saved ✓':'Session counted ✓ — storage unavailable';m.style.display='block';setTimeout(()=>m.style.display='none',4000);
+ try{beep(660);vib(400)}catch(e){}}
+$('start').onclick=startS;$('stop').onclick=stopS;
+$('prev').onclick=()=>{S.weekOverride=Math.max(0,week()-1);save();render()};$('next').onclick=()=>{S.weekOverride=Math.min(3,week()+1);save();render()};
+$('reset').onclick=()=>{if(confirm('Reset all progress?')){S={start:null,days:{},weekOverride:null};save();render()}};
+save();render();
+</script></body></html>
